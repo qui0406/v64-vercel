@@ -13,6 +13,7 @@ export const endpoints ={
     "product-details": id => `/products/details/${id}`,
 
     "get-all-color": "/color-products/get-all",
+    "get-all-size": "/size-products/get-all-size-products",
 
     "delete-product": id => `/products/delete/${id}`,
 }

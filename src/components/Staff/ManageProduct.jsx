@@ -14,13 +14,15 @@ const ManageProduct = () => {
   const [currentProduct, setCurrentProduct] = useState(null);
   const [viewProduct, setViewProduct] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const [sizeList, setSizeList] = useState([]);
   const [formData, setFormData] = useState({
     id: '',
     name: '',
     description: '',
     price: '',
     sex: false,
-    colorProductId: '',
+    colorProductId: [], 
     quantity: 0,
     typeProductId: '',
     productDetails: {
@@ -28,7 +30,7 @@ const ManageProduct = () => {
       material: '',
       design: '',
       standard: '',
-      sizeStandard: '',
+      sizeStandard: [], 
       eo: 0,
       mong: 0,
       lai: 0,
@@ -76,7 +78,7 @@ const ManageProduct = () => {
   // Fetch color products from API
   const fetchColorProducts = async () => {
     try {
-      let res = await Apis.get(endpoints['get-all-color']);
+      let res = await authApis().get(endpoints['get-all-color']);
       if (res.status === 200 || res.status === 201) {
         const result = res.data?.result || [];
         setColorProducts(result);
@@ -87,10 +89,24 @@ const ManageProduct = () => {
     }
   };
 
+  const fetchSize = async () => {
+    try {
+      let res = await authApis().get(endpoints['get-all-size']);
+      if (res.status === 200 || res.status === 201) {
+        const result = res.data?.result || [];
+        setSizeList(result);
+        console.log("Size products fetched:", result);
+      }
+    } catch (error) {
+      console.error("Error fetching size products:", error);
+    }
+  };
+
   useEffect(() => {
     fetchProduct();
     fetchTypeProducts();
     fetchColorProducts();
+    fetchSize();
   }, []);
 
   const resetForm = () => {
@@ -101,7 +117,7 @@ const ManageProduct = () => {
       description: '',
       price: '',
       sex: false,
-      colorProductId: '',
+      colorProductId: [],
       quantity: 0,
       typeProductId: '',
       productDetails: {
@@ -109,7 +125,7 @@ const ManageProduct = () => {
         material: '',
         design: '',
         standard: '',
-        sizeStandard: '',
+        sizeStandard: [],
         eo: 0,
         mong: 0,
         lai: 0,
@@ -129,7 +145,7 @@ const ManageProduct = () => {
         description: product.description,
         price: product.price,
         sex: product.sex,
-        colorProductId: product.colorProduct?.id || '',
+        colorProductId: Array.isArray(product.colorProductId) ? product.colorProductId : (product.colorProduct?.id ? [product.colorProduct.id] : []),
         quantity: product.quantity,
         typeProductId: product.typeProduct?.id || '',
         productDetails: product.productDetails ? {
@@ -137,7 +153,7 @@ const ManageProduct = () => {
           material: product.productDetails.material || '',
           design: product.productDetails.design || '',
           standard: product.productDetails.standard || '',
-          sizeStandard: product.productDetails.sizeStandard || '',
+          sizeStandard: Array.isArray(product.productDetails.sizeStandard) ? product.productDetails.sizeStandard : (product.productDetails.sizeStandard ? [product.productDetails.sizeStandard] : []),
           eo: product.productDetails.eo || 0,
           mong: product.productDetails.mong || 0,
           lai: product.productDetails.lai || 0,
@@ -148,7 +164,7 @@ const ManageProduct = () => {
           material: '',
           design: '',
           standard: '',
-          sizeStandard: '',
+          sizeStandard: [],
           eo: 0,
           mong: 0,
           lai: 0,
@@ -176,6 +192,17 @@ const ManageProduct = () => {
     }));
   };
 
+  // Xử lý thay đổi cho select multiple (màu sắc)
+  const handleColorChange = (e) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+    console.log("Selected colors:", selectedOptions); // Debug
+    
+    setFormData(prev => ({
+      ...prev,
+      colorProductId: selectedOptions
+    }));
+  };
+
   const handleDetailsChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -187,29 +214,41 @@ const ManageProduct = () => {
     }));
   };
 
+  // Xử lý thay đổi cho select multiple (size)
+  const handleSizeChange = (e) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+    console.log("Selected sizes:", selectedOptions); // Debug
+    
+    setFormData(prev => ({
+      ...prev,
+      productDetails: {
+        ...prev.productDetails,
+        sizeStandard: selectedOptions
+      }
+    }));
+  };
+
   // Handle image file upload from computer
   const handleImageUpload = (e) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64String = reader.result;
-          setFormData(prev => ({
-            ...prev,
-            images: [...prev.images, {
-              id: Date.now().toString() + Math.random(),
-              image: base64String,
-              description: file.name
-            }]
-          }));
-        };
-        reader.readAsDataURL(file);
-      });
+      const newImages = Array.from(files).map(file => ({
+        id: Date.now().toString() + Math.random(),
+        file: file, 
+        preview: URL.createObjectURL(file), 
+        description: file.name
+      }));
+
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...newImages]
+      }));
+
+      console.log("Added images:", newImages);
     }
-    // Reset input value để có thể chọn lại cùng file
     e.target.value = '';
   };
+
 
   const handleRemoveImage = (imageId) => {
     setFormData(prev => ({
@@ -223,65 +262,128 @@ const ManageProduct = () => {
     e.preventDefault();
     setLoading(true);
 
+    console.log("=== DEBUG FORM DATA ===");
+    console.log("FormData:", formData);
+    console.log("Images details:", formData.images);
+
+    // Debug chi tiết từng ảnh
+    formData.images.forEach((img, index) => {
+      console.log(`Image ${index}:`, {
+        id: img.id,
+        file: img.file,
+        fileType: img.file?.type,
+        fileSize: img.file?.size,
+        fileName: img.file?.name,
+        preview: img.preview,
+        isFileInstance: img.file instanceof File
+      });
+    });
+
     try {
-      const productData = {
-        name: formData.name,
-        description: formData.description,
-        price: parseFloat(formData.price),
-        sex: formData.sex,
-        colorProductId: formData.colorProductId,
-        quantity: parseInt(formData.quantity),
-        typeProductId: formData.typeProductId,
-        productDetails: {
-          description: formData.productDetails.description,
-          material: formData.productDetails.material,
-          design: formData.productDetails.design,
-          standard: formData.productDetails.standard,
-          sizeStandard: formData.productDetails.sizeStandard,
-          eo: parseFloat(formData.productDetails.eo) || 0,
-          mong: parseFloat(formData.productDetails.mong) || 0,
-          lai: parseFloat(formData.productDetails.lai) || 0,
-          suonTrong: parseFloat(formData.productDetails.suonTrong) || 0,
-          suonNgoai: parseFloat(formData.productDetails.suonNgoai) || 0
-        },
-        images: formData.images.map(img => ({
-          image: img.image,
-          description: img.description || ''
-        }))
-      };
+      const form = new FormData();
 
-      let res;
-      if (currentProduct) {
-        // // UPDATE existing product
-        // res = await authApis().put(
-        //   `${endpoints['products']}/${currentProduct.id}`,
-        //   productData
-        // );
+      // 🧱 Các trường cơ bản
+      form.append("name", formData.name);
+      form.append("description", formData.description);
+      form.append("price", parseFloat(formData.price));
+      form.append("sex", formData.sex);
+      form.append("quantity", parseInt(formData.quantity));
+      form.append("typeProductId", formData.typeProductId);
 
-        // if (res.status === 200 || res.status === 201) {
-        //   alert('Cập nhật sản phẩm thành công!');
-        //   fetchProduct();
-        // }
-
-        alert('Chức năng cập nhật sản phẩm hiện chưa được hỗ trợ.');
-      } else {
-        // CREATE new product
-        res = await authApis().post(endpoints['product/create'], productData);
-
-        if (res.status === 200 || res.status === 201) {
-          alert('Thêm sản phẩm mới thành công!');
-          fetchProduct();
-        }
+      // 🎨 Màu
+      console.log("Color IDs:", formData.colorProductId);
+      if (Array.isArray(formData.colorProductId)) {
+        formData.colorProductId.forEach((colorId) => {
+          form.append("colorProductIds", colorId);
+        });
       }
 
-      handleCloseModal();
+      // 📏 Size - SỬA THÀNH productDetails.sizeStandard
+      console.log("Size IDs:", formData.productDetails.sizeStandard);
+      if (Array.isArray(formData.productDetails.sizeStandard)) {
+        formData.productDetails.sizeStandard.forEach((size) => {
+          form.append("productDetails.sizeStandard", size); // ✅ Sửa thành productDetails.sizeStandard
+        });
+      }
+
+      // 🧶 Chi tiết sản phẩm
+      form.append("productDetails.description", formData.productDetails.description || "");
+      form.append("productDetails.material", formData.productDetails.material || "");
+      form.append("productDetails.design", formData.productDetails.design || "");
+      form.append("productDetails.standard", formData.productDetails.standard || "");
+      form.append("productDetails.eo", parseFloat(formData.productDetails.eo) || 0);
+      form.append("productDetails.mong", parseFloat(formData.productDetails.mong) || 0);
+      form.append("productDetails.lai", parseFloat(formData.productDetails.lai) || 0);
+      form.append("productDetails.suonTrong", parseFloat(formData.productDetails.suonTrong) || 0);
+      form.append("productDetails.suonNgoai", parseFloat(formData.productDetails.suonNgoai) || 0);
+
+      // 🖼️ Ảnh - FIX QUAN TRỌNG
+      console.log("Images to send:", formData.images);
+      let hasValidImages = false;
+      
+      if (formData.images && formData.images.length > 0) {
+        formData.images.forEach((img, index) => {
+          if (img.file && img.file instanceof File) {
+            console.log(`✅ Appending image ${index}:`, img.file.name, "Size:", img.file.size, "Type:", img.file.type);
+            form.append("images", img.file, img.file.name); // ✅ Thêm filename thứ 3
+            hasValidImages = true;
+          } else {
+            console.warn(`❌ Image ${index} is not a valid File:`, img);
+          }
+        });
+      }
+
+      console.log("Has valid images to send:", hasValidImages);
+   
+
+      if (!hasValidImages) {
+        console.warn("⚠️ No valid images to send!");
+        // KHÔNG append "images" field nếu không có ảnh hợp lệ
+      }
+
+      // ✅ Debug FormData chi tiết
+      console.log("=== FINAL FORMDATA CONTENTS ===");
+      let imageCount = 0;
+      for (let pair of form.entries()) {
+        if (pair[0] === "images") {
+          console.log(`images[${imageCount}]:`, pair[1].name, "Size:", pair[1].size, "Type:", pair[1].type);
+          imageCount++;
+        } else {
+          console.log(pair[0] + ':', pair[1]);
+        }
+      }
+      console.log("Total images in FormData:", imageCount);
+
+      // Gửi request
+      let res = await authApis().post(endpoints["product/create"], form, {
+        headers: {
+          "Content-Type": "multipart/form-data", // ✅ Browser sẽ tự set boundary
+        },
+      });
+
+      if (res.status === 200 || res.status === 201) {
+        alert("Thêm sản phẩm mới thành công!");
+        fetchProduct();
+        handleCloseModal();
+      }
+
     } catch (error) {
-      console.error('Error saving product:', error);
-      alert('Lỗi khi lưu sản phẩm: ' + (error.response?.data?.message || error.message));
+      console.error("❌ Lỗi khi lưu sản phẩm:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+      
+      // Debug thêm
+      if (error.response) {
+        console.error("Response headers:", error.response.headers);
+        console.error("Response data:", error.response.data);
+      }
+      
+      alert("Lỗi khi lưu sản phẩm: " + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
   };
+
 
   // Handle delete via API
   const handleDelete = async (productId) => {
@@ -337,7 +439,6 @@ const ManageProduct = () => {
                 <th style={styles.th}>Tên</th>
                 <th style={styles.th}>Giá</th>
                 <th style={styles.th}>Loại</th>
-                <th style={styles.th}>Màu</th>
                 <th style={styles.th}>Số lượng</th>
                 <th style={styles.th}>Giới tính</th>
                 <th style={{ ...styles.th, textAlign: 'center' }}>Thao tác</th>
@@ -358,10 +459,8 @@ const ManageProduct = () => {
                     <td style={styles.td}>
                       {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.price)}
                     </td>
-                    <td style={styles.td}>{product.typeProduct?.name || 'N/A'}</td>
-                    <td style={styles.td}>
-                      <span style={styles.badgeColor}>{product.colorProduct?.name || 'N/A'}</span>
-                    </td>
+                    <td style={styles.td}>{product.typeProductResponse?.name || 'N/A'}</td>
+                    
                     <td style={styles.td}>{product.quantity}</td>
                     <td style={styles.td}>
                       <span style={product.sex ? styles.badgeFemale : styles.badgeMale}>
@@ -440,21 +539,24 @@ const ManageProduct = () => {
                 </div>
 
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Màu sắc *</label>
+                  <label style={styles.label}>Màu sắc * (Giữ Ctrl/Cmd để chọn nhiều)</label>
                   <select 
                     name="colorProductId" 
-                    value={formData.colorProductId} 
-                    onChange={handleInputChange} 
+                    multiple
+                    value={formData.colorProductId}
+                    onChange={handleColorChange}
                     required 
-                    style={styles.select}
+                    style={{ ...styles.select, height: '120px' }}
                   >
-                    <option value="">-- Chọn màu sắc --</option>
                     {colorProducts.map(color => (
                       <option key={color.id} value={color.id}>
                         {color.name}
                       </option>
                     ))}
                   </select>
+                  <small style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                    Đã chọn: {formData.colorProductId.length} màu
+                  </small>
                 </div>
 
                 <div style={styles.formGroup}>
@@ -494,6 +596,7 @@ const ManageProduct = () => {
                     <span>Dành cho nam</span>
                   </label>
                 </div>
+
                 <div style={{ ...styles.formGroup, gridColumn: '1 / -1' }}>
                   <label style={styles.label}>Mô tả</label>
                   <textarea 
@@ -547,15 +650,24 @@ const ManageProduct = () => {
                   </div>
 
                   <div style={styles.formGroup}>
-                    <label style={styles.label}>Size</label>
-                    <input 
-                      type="text" 
-                      name="sizeStandard" 
-                      value={formData.productDetails.sizeStandard} 
-                      onChange={handleDetailsChange} 
-                      style={styles.input}
-                      placeholder="VD: M, L, XL" 
-                    />
+                    <label style={styles.label}>Size * (Giữ Ctrl/Cmd để chọn nhiều)</label>
+                    <select
+                      name="sizeStandard"
+                      multiple
+                      value={formData.productDetails.sizeStandard}
+                      onChange={handleSizeChange}
+                      required
+                      style={{ ...styles.select, height: '120px' }}
+                    >
+                      {sizeList.map(size => (
+                        <option key={size.id} value={size.id}>
+                          {size.name}
+                        </option>
+                      ))}
+                    </select>
+                    <small style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                      Đã chọn: {formData.productDetails.sizeStandard.length} size
+                    </small>
                   </div>
 
                   <div style={styles.formGroup}>
@@ -681,8 +793,6 @@ const ManageProduct = () => {
                   type="submit" 
                   style={{ ...styles.btn, ...styles.btnPrimary }} 
                   disabled={loading}
-
-                  onClick={handleSubmit}
                 >
                   <span style={styles.icon}>💾</span>
                   {loading ? 'Đang xử lý...' : (currentProduct ? 'Cập nhật' : 'Thêm mới')}

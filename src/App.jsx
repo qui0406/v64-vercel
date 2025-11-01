@@ -1,6 +1,7 @@
 import logo from './logo.svg';
 import './App.css';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from './context/AuthContext';
 
 
 import Footer from "./components/Layouts/Footer";
@@ -9,6 +10,7 @@ import Header from "./components/Layouts/Header";
 import Register from "./components/Auth/Register"
 import Login from "./components/Auth/Login"
 import Profile from "./components/Auth/Profile"
+import OAuth2Redirect from "./components/Auth/OAuth2Redirect"
 
 import Home from "./components/Home"
 import AboutShop from "./components/AboutShop"
@@ -62,11 +64,13 @@ function App() {
   }, []);
 
   return (
+    <AuthProvider>
     <MyUserContext.Provider value={user}>
       <MyDispatchContext.Provider value={dispatch}>
         <BrowserRouter>
           <Header />
           <Routes>
+            <Route path="/oauth2/redirect" element={<OAuth2Redirect />} />
             <Route path="/" element={<Home />} />
             <Route path="/pages/he-thong-cua-hang-v-sixtyfour" element= {<AboutShop/>} />
 
@@ -93,11 +97,12 @@ function App() {
             <Route path="/product/orders" element = {<OrderManage />} />
             <Route path="/product/statistics" element = {<Statistics />} />
           </Routes>
-          {user?.roles?.some(role => role.name === "USER") && <AgentXChat />}
-          <AgentXChat />
+        <Footer />
+        <AgentXChat />
         </BrowserRouter>
       </MyDispatchContext.Provider>
     </MyUserContext.Provider >
+    </AuthProvider>
   );
 }
 
